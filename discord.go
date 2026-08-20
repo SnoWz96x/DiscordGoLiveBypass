@@ -122,7 +122,28 @@ func LocateDiscord(channel Channel) (string, error) {
 	}
 
 	sort.Slice(versions, func(i, j int) bool { return newerThan(versions[i], versions[j]) })
-	return byVersion[fmt.Sprint(versions[0])], nil
+	for _, version := range versions {
+		binary := byVersion[fmt.Sprint(version)]
+		if complete(filepath.Dir(binary)) {
+			return binary, nil
+		}
+	}
+
+	return "", fmt.Errorf("achei %s em %s, mas nenhuma versao esta completa. Isso e update interrompido: abra o %s normalmente uma vez, deixe ele terminar de se atualizar e rode de novo", channel.Binary, root, channel.Friendly)
+}
+
+// Update interrompido deixa a pasta da versão nova com o executável, mas sem os arquivos que
+// o Chromium precisa para subir. O processo nasce e morre sozinho, então a pasta mais nova
+// não serve só por ser a mais nova.
+var runtimeFiles = []string{"icudtl.dat", "resources.pak", "locales"}
+
+func complete(dir string) bool {
+	for _, name := range runtimeFiles {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // O Discord é instância única: subir um segundo processo com as flags só acorda a janela do

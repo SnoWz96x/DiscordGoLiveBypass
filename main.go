@@ -14,6 +14,10 @@ import (
 // imagem em dez segundos de espera, e nada disso muda a região que o Discord enxerga.
 const defaultBypass = "cdn.discordapp.com;*.discordapp.net;*.discord.media;<local>"
 
+// Tempo que o processo precisa sobreviver para a abertura contar como bem-sucedida. Quem
+// morre por instalação quebrada morre bem antes disso.
+const survivalDelay = 3 * time.Second
+
 type options struct {
 	manual   string
 	exclude  string
@@ -165,6 +169,14 @@ func run(opts options, ui *UI) error {
 	if err != nil {
 		return fmt.Errorf("nao consegui abrir o %s: %w", channel.Friendly, err)
 	}
+	// O Start só prova que o processo nasceu. Sem conferir se ele sobreviveu, uma instalação
+	// quebrada faz a tela mostrar a caixa verde com nada aberto.
+	ui.Busy("conferindo se o %s continua de pe", channel.Friendly)
+	time.Sleep(survivalDelay)
+	if alive, err := IsRunning(channel); err == nil && !alive {
+		return fmt.Errorf("o %s abriu (pid %d) e morreu logo em seguida, sem chegar a mostrar janela. Costuma ser instalacao incompleta: abra o %s normalmente uma vez, deixe ele terminar de se atualizar e rode de novo", channel.Friendly, pid, channel.Friendly)
+	}
+
 	ui.Ok("%s aberto, pid %d", channel.Friendly, pid)
 	ui.Detail("%s", args[0])
 

@@ -159,6 +159,15 @@ Só acontece se você chamar o programa sem o `-force`. O `Abrir-Discord.bat` e 
 </details>
 
 <details>
+<summary><strong>Apareceu "abriu e morreu logo em seguida"</strong></summary>
+<br>
+
+O Discord subiu e caiu antes de mostrar janela, o que quase sempre é atualização interrompida: sobra uma pasta da versão nova com o executável, mas sem os arquivos que o Chromium precisa para iniciar. Abra o Discord pelo atalho normal uma vez, deixe ele terminar de se atualizar, feche e rode de novo.
+
+O programa já evita essas pastas sozinho e usa a última versão que estiver completa. A mensagem só aparece quando nenhuma está, ou quando você apontou uma na mão com `-exe`.
+</details>
+
+<details>
 <summary><strong>O Discord abre mas fica travado em "Connecting"</strong></summary>
 <br>
 
