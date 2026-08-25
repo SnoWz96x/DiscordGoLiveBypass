@@ -153,20 +153,28 @@ type probeResult struct {
 	latency  time.Duration
 }
 
-func PickFreeProxy(excluded map[string]bool, deadline time.Time, ui *UI) (Endpoint, time.Duration, error) {
+// O país já vem conferido pela fonte que escolheu o proxy. Perguntar de novo depois gastaria
+// outra consulta pelo mesmo IP de saída, e o serviço de geolocalização limita por IP.
+type choice struct {
+	endpoint Endpoint
+	latency  time.Duration
+	country  string
+}
+
+func PickFreeProxy(excluded map[string]bool, deadline time.Time, ui *UI) (choice, error) {
 	ui.Busy("baixando a lista publica de proxies")
 	body, err := downloadText(freeProxyAPI)
 	if err != nil {
-		return Endpoint{}, 0, fmt.Errorf("nao consegui baixar a lista de proxies: %w", err)
+		return choice{}, fmt.Errorf("nao consegui baixar a lista de proxies: %w", err)
 	}
 
 	candidates, err := rankFreeProxies(body, excluded)
 	if err != nil {
-		return Endpoint{}, 0, fmt.Errorf("a lista de proxies veio num formato inesperado: %w", err)
+		return choice{}, fmt.Errorf("a lista de proxies veio num formato inesperado: %w", err)
 	}
 
 	if len(candidates) == 0 {
-		return Endpoint{}, 0, errors.New("nenhuma candidata sobreviveu aos filtros da lista")
+		return choice{}, errors.New("nenhuma candidata sobreviveu aos filtros da lista")
 	}
 	ui.Ok("%d candidatas depois dos filtros", len(candidates))
 
@@ -177,7 +185,7 @@ func PickFreeProxy(excluded map[string]bool, deadline time.Time, ui *UI) (Endpoi
 
 	for start := 0; start < len(candidates); start += parallelProbes {
 		if time.Now().After(deadline) {
-			return Endpoint{}, 0, errors.New("o prazo acabou antes de achar uma proxy valida")
+			return choice{}, errors.New("o prazo acabou antes de achar uma proxy valida")
 		}
 
 		end := start + parallelProbes
@@ -224,11 +232,11 @@ func PickFreeProxy(excluded map[string]bool, deadline time.Time, ui *UI) (Endpoi
 				continue
 			}
 			ui.Ok("%s serve, %d ms, saida em %s", result.endpoint, result.latency.Milliseconds(), CountryLabel(country))
-			return result.endpoint, result.latency, nil
+			return choice{result.endpoint, result.latency, country}, nil
 		}
 	}
 
-	return Endpoint{}, 0, errors.New("nenhuma proxy da lista passou nos testes")
+	return choice{}, errors.New("nenhuma proxy da lista passou nos testes")
 }
 
 func listening(port int, timeout time.Duration) bool {
@@ -240,7 +248,7 @@ func listening(port int, timeout time.Duration) bool {
 	return true
 }
 
-func DetectTor(excluded map[string]bool, ui *UI) (Endpoint, time.Duration, bool) {
+func DetectTor(excluded map[string]bool, ui *UI) (choice, bool) {
 	for _, port := range torPorts {
 		if !listening(port, torPortTimeout) {
 			continue
@@ -261,9 +269,9 @@ func DetectTor(excluded map[string]bool, ui *UI) (Endpoint, time.Duration, bool)
 		}
 
 		ui.Ok("Tor local na porta %d, %d ms, saida em %s", port, latency.Milliseconds(), CountryLabel(country))
-		return endpoint, latency, true
+		return choice{endpoint, latency, country}, true
 	}
-	return Endpoint{}, 0, false
+	return choice{}, false
 }
 
 type cacheFile struct {
@@ -300,6 +308,32 @@ func ReadCachedProxy() (Endpoint, bool) {
 	}
 
 	return ParseProxy(cached.Proxy)
+}
+
+// Proxy pública troca de saída sem avisar, então a guardada precisa provar de novo as duas
+// coisas: que responde e que não passou a sair de um país recusado.
+func ReuseCachedProxy(excluded map[string]bool, ui *UI) (choice, bool) {
+	cached, ok := ReadCachedProxy()
+	if !ok {
+		return choice{}, false
+	}
+
+	ui.Busy("revalidando a proxy da execucao anterior: %s", cached)
+	latency, err := Probe(cached, fastProbeTimeout)
+	if err != nil {
+		ui.Warn("a proxy guardada nao respondeu mais, procurando outra")
+		return choice{}, false
+	}
+
+	country, err := Accepts(cached, excluded, probeTimeout)
+	if err != nil {
+		ui.Warn("a proxy guardada nao serve mais: %v", err)
+		return choice{}, false
+	}
+
+	ui.Ok("a proxy guardada ainda serve, %d ms, saida em %s", latency.Milliseconds(), CountryLabel(country))
+	ui.Detail("%s", cached)
+	return choice{cached, latency, country}, true
 }
 
 func StoreCachedProxy(e Endpoint) error {

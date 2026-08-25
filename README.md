@@ -46,17 +46,16 @@ Uma janela preta mostra o progresso e fecha sozinha quando termina:
  │  abre o Discord por um IP de fora, sem VPN no sistema  │
  ╰────────────────────────────────────────────────────────╯
 
- ▸ 1/4  Procurando a instalacao do Discord
+ ▸ 1/3  Procurando a instalacao do Discord
    ✔  Discord encontrado
       C:\Users\voce\AppData\Local\Discord\app-1.0.9253\Discord.exe
 
- ▸ 2/4  Procurando uma saida fora de Brasil (BR)
+ ▸ 2/3  Procurando uma saida fora de Brasil (BR)
    ⠹  ██████████░░░░░░░░░░░░░░  18/40  3 responderam ate agora
+   ✔  socks5://213.136.92.91:1080 serve, 1542 ms, saida em Alemanha (DE)
+      guardada para acelerar a proxima execucao
 
- ▸ 3/4  Confirmando por onde a conexao vai sair
-   ✔  a saida esta em Alemanha (DE)
-
- ▸ 4/4  Abrindo o Discord
+ ▸ 3/3  Abrindo o Discord
    ✔  Discord aberto, pid 14240
 
  ╭─ tudo pronto ──────────────────────────────────╮
@@ -149,6 +148,13 @@ Todos os servidores testados estavam fora do ar ou lentos demais. É comum, eles
 ```
 DiscordGoLiveBypass.exe -force -timeout 5m
 ```
+</details>
+
+<details>
+<summary><strong>Apareceu "saida em BR, que esta na lista de recusados"</strong></summary>
+<br>
+
+O servidor respondeu bem, mas sai num país que você recusou, e usá-lo deixaria o Go Live bloqueado do mesmo jeito. Só aparece como erro quando o servidor foi escolhido por você com `-proxy`: trocá-lo por outro sem avisar seria pior que parar. Nos outros casos o programa apenas descarta e continua procurando, que é o que acontece quando o servidor guardado da última vez mudou de saída.
 </details>
 
 <details>

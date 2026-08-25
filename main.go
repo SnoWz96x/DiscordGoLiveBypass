@@ -86,9 +86,9 @@ func run(opts options, ui *UI) error {
 		return errors.New("a lista de paises recusados ficou vazia, informe algo como -exclude BR")
 	}
 
-	steps := 4
+	steps := 3
 	if opts.checkRun {
-		steps = 3
+		steps = 2
 	}
 	ui.Plan(steps)
 	ui.Banner()
@@ -126,29 +126,21 @@ func run(opts options, ui *UI) error {
 	}
 
 	ui.Step("Procurando uma saida fora de %s", excludedLabel(excluded))
-	endpoint, latency, err := resolveProxy(opts, excluded, ui)
+	chosen, err := resolveProxy(opts, excluded, ui)
 	if err != nil {
 		return err
 	}
 
-	ui.Step("Confirmando por onde a conexao vai sair")
-	ui.Busy("consultando o servico de geolocalizacao por dentro do proxy")
-	country, err := ExitCountry(endpoint, probeTimeout)
-	if err != nil {
-		return fmt.Errorf("nao consegui confirmar o pais de saida de %s: %w", endpoint, err)
-	}
-	ui.Ok("a saida esta em %s", CountryLabel(country))
-
-	if err := StoreCachedProxy(endpoint); err != nil {
+	if err := StoreCachedProxy(chosen.endpoint); err != nil {
 		ui.Warn("nao consegui guardar a proxy para a proxima vez: %v", err)
 	} else {
 		ui.Detail("guardada para acelerar a proxima execucao")
 	}
 
 	summary := [][2]string{
-		{"saida", CountryLabel(country)},
-		{"servidor", endpoint.String()},
-		{"resposta", fmt.Sprintf("%d ms", latency.Milliseconds())},
+		{"saida", CountryLabel(chosen.country)},
+		{"servidor", chosen.endpoint.String()},
+		{"resposta", fmt.Sprintf("%d ms", chosen.latency.Milliseconds())},
 	}
 
 	if opts.checkRun {
@@ -163,7 +155,7 @@ func run(opts options, ui *UI) error {
 		return err
 	}
 
-	args := append(ProxyArgs(endpoint, opts.bypass, opts.fallback), opts.extra...)
+	args := append(ProxyArgs(chosen.endpoint, opts.bypass, opts.fallback), opts.extra...)
 	ui.Busy("subindo o processo com as flags de proxy")
 	pid, err := Launch(binary, args)
 	if err != nil {
@@ -247,13 +239,13 @@ func terminateIfRunning(channel Channel, ui *UI) error {
 }
 
 // As fontes vêm da mais previsível para a mais lenta.
-func resolveProxy(opts options, excluded map[string]bool, ui *UI) (Endpoint, time.Duration, error) {
+func resolveProxy(opts options, excluded map[string]bool, ui *UI) (choice, error) {
 	deadline := time.Now().Add(opts.deadline)
 
 	if opts.manual != "" {
 		endpoint, ok := ParseProxy(opts.manual)
 		if !ok {
-			return Endpoint{}, 0, fmt.Errorf("proxy invalido: %q. Use algo como socks5://1.2.3.4:1080", opts.manual)
+			return choice{}, fmt.Errorf("proxy invalido: %q. Use algo como socks5://1.2.3.4:1080", opts.manual)
 		}
 
 		ui.Busy("testando o proxy que voce passou: %s", endpoint)
@@ -261,29 +253,28 @@ func resolveProxy(opts options, excluded map[string]bool, ui *UI) (Endpoint, tim
 		if err != nil {
 			// Quem escolheu um proxy quer aquele, então não caímos para a busca automática:
 			// ser mandado para um endereço desconhecido em silêncio é pior que o erro.
-			return Endpoint{}, 0, fmt.Errorf("seu proxy %s nao respondeu: %w", endpoint, err)
+			return choice{}, fmt.Errorf("seu proxy %s nao respondeu: %w", endpoint, err)
 		}
 
-		ui.Ok("seu proxy respondeu em %d ms", latency.Milliseconds())
-		return endpoint, latency, nil
+		country, err := Accepts(endpoint, excluded, probeTimeout)
+		if err != nil {
+			return choice{}, fmt.Errorf("seu proxy %s nao serve: %w", endpoint, err)
+		}
+
+		ui.Ok("seu proxy respondeu em %d ms, saida em %s", latency.Milliseconds(), CountryLabel(country))
+		return choice{endpoint, latency, country}, nil
 	}
 
 	if !opts.noCache {
-		if cached, ok := ReadCachedProxy(); ok {
-			ui.Busy("revalidando a proxy da execucao anterior: %s", cached)
-			if latency, err := Probe(cached, fastProbeTimeout); err == nil {
-				ui.Ok("a proxy guardada ainda serve, %d ms", latency.Milliseconds())
-				ui.Detail("%s", cached)
-				return cached, latency, nil
-			}
-			ui.Warn("a proxy guardada nao respondeu mais, procurando outra")
+		if cached, ok := ReuseCachedProxy(excluded, ui); ok {
+			return cached, nil
 		}
 	}
 
 	if !opts.noTor {
 		ui.Busy("procurando um Tor local nas portas conhecidas")
-		if tor, latency, ok := DetectTor(excluded, ui); ok {
-			return tor, latency, nil
+		if tor, ok := DetectTor(excluded, ui); ok {
+			return tor, nil
 		}
 	}
 
