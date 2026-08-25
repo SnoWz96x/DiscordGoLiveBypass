@@ -1,0 +1,32 @@
+name: ci
+
+# Confere a cada mudança, e não só na tag: quebrar o build na hora de publicar uma release
+# significa descobrir tarde, com a versão já anunciada.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Um passo por comando: num passo só, a falha do primeiro sumiria atrás do sucesso do
+      # último, porque o shell devolve o código de saída da última linha.
+      - name: Analisar
+        run: go vet ./...
+
+      - name: Testar
+        run: go test ./...
+
+      - name: Compilar
+        run: go build ./...

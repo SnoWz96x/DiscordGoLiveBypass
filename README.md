@@ -6,7 +6,7 @@
 
 [![Versão](https://img.shields.io/github/v/release/thomassolcia/DiscordGoLiveBypass?style=flat-square&label=vers%C3%A3o&color=5865F2)](../../releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/thomassolcia/DiscordGoLiveBypass/total?style=flat-square&label=downloads&color=5865F2)](../../releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/thomassolcia/DiscordGoLiveBypass/release.yml?style=flat-square&label=build)](../../actions)
+[![Build](https://img.shields.io/github/actions/workflow/status/thomassolcia/DiscordGoLiveBypass/ci.yml?style=flat-square&label=build)](../../actions)
 [![Licença](https://img.shields.io/github/license/thomassolcia/DiscordGoLiveBypass?style=flat-square&label=licen%C3%A7a)](LICENSE)
 ![Windows](https://img.shields.io/badge/plataforma-Windows-0078D4?style=flat-square)
 
