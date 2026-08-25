@@ -111,17 +111,18 @@ func run(opts options, ui *UI) error {
 		ui.Ok("%s encontrado", channel.Friendly)
 		ui.Detail("%s", binary)
 
-		if running, err := IsRunning(channel); err != nil {
+		running, err := IsRunning(channel)
+		switch {
+		case err != nil && opts.checkRun:
 			ui.Warn("nao consegui checar se o %s ja esta aberto: %v", channel.Friendly, err)
-		} else if running {
-			switch {
-			case opts.checkRun:
-				ui.Warn("o %s esta aberto agora, uma abertura de verdade pediria -force", channel.Friendly)
-			case !opts.force:
-				return fmt.Errorf("o %s ja esta aberto. Ele e instancia unica, entao abrir de novo so acorda a janela antiga, que continua no IP daqui. Feche-o ou rode com -force", channel.Friendly)
-			default:
-				ui.Warn("o %s ja esta aberto, sera reiniciado no fim", channel.Friendly)
-			}
+		case err != nil:
+			return fmt.Errorf("nao consegui checar se o %s ja esta aberto: %w. Sem essa resposta nao da para abrir: se ele estiver de pe, o processo novo so acorda a janela antiga, que continua no IP daqui, e a tela mostraria sucesso do mesmo jeito", channel.Friendly, err)
+		case running && opts.checkRun:
+			ui.Warn("o %s esta aberto agora, uma abertura de verdade pediria -force", channel.Friendly)
+		case running && !opts.force:
+			return fmt.Errorf("o %s ja esta aberto. Ele e instancia unica, entao abrir de novo so acorda a janela antiga, que continua no IP daqui. Feche-o ou rode com -force", channel.Friendly)
+		case running:
+			ui.Warn("o %s ja esta aberto, sera reiniciado no fim", channel.Friendly)
 		}
 	}
 
@@ -221,7 +222,10 @@ func resolveTarget(opts options, ui *UI) (Channel, string, error) {
 
 func terminateIfRunning(channel Channel, ui *UI) error {
 	running, err := IsRunning(channel)
-	if err != nil || !running {
+	if err != nil {
+		return fmt.Errorf("nao consegui checar se o %s esta aberto para encerra-lo: %w", channel.Friendly, err)
+	}
+	if !running {
 		return nil
 	}
 
