@@ -258,6 +258,13 @@ go build -o DiscordGoLiveBypass.exe .
 | `ui.go` | etapas, spinner, barra de progresso, caixas de resumo e de erro |
 | `update.go` | versão do build e consulta da última release no GitHub |
 | `console*.go` | liga ANSI e UTF-8 no console, e detecta quando cair para texto puro |
+| `*_test.go` | testes das partes que dão para checar sem rede nem Discord instalado |
+
+Os testes rodam sem rede e sem Discord na máquina, e cobrem a ordem das versões, os filtros da lista pública e a leitura das opções:
+
+```
+go test ./...
+```
 
 ## Créditos
 
