@@ -165,7 +165,7 @@ func PickFreeProxy(excluded map[string]bool, deadline time.Time, ui *UI) (choice
 	ui.Busy("baixando a lista publica de proxies")
 	body, err := downloadText(freeProxyAPI)
 	if err != nil {
-		return choice{}, fmt.Errorf("nao consegui baixar a lista de proxies: %w", err)
+		return choice{}, fmt.Errorf("nao consegui baixar a lista de proxies: %s", DescribeNetwork(err))
 	}
 
 	candidates, err := rankFreeProxies(body, excluded)

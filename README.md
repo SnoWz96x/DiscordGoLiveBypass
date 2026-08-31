@@ -174,6 +174,20 @@ O programa já evita essas pastas sozinho e usa a última versão que estiver co
 </details>
 
 <details>
+<summary><strong>Apareceu "a conexao foi bloqueada pela sua propria maquina"</strong></summary>
+<br>
+
+O Windows recusou a conexão antes de ela sair para a internet, com o código `WSAEACCES` (na mensagem original: *an attempt was made to access a socket in a way forbidden by its access permissions*). Não é a lista de proxies fora do ar nem sua internet: é algo instalado aí barrando este programa, quase sempre um antivírus com proteção de rede (Avast, AVG, ESET, Kaspersky, McAfee) ou uma regra de saída do Firewall do Windows. O executável não tem assinatura digital, e programa sem assinatura é o alvo preferido dessas proteções.
+
+O que tentar, nessa ordem:
+
+1. Abra seu antivírus, procure a lista de exceções e adicione o `DiscordGoLiveBypass.exe`.
+2. Se você usa VPN, feche-a e rode de novo: alguns clientes deixam um filtro de rede ativo mesmo desconectados.
+3. Se continuar, confira no Firewall do Windows (Segurança Avançada, Regras de Saída) se existe uma regra bloqueando o programa.
+4. Se preferir não mexer em exceção nenhuma, [compile do código-fonte](#compilar-do-código-fonte): o binário que sai do seu próprio `go build` costuma passar.
+</details>
+
+<details>
 <summary><strong>O Discord abre mas fica travado em "Connecting"</strong></summary>
 <br>
 
