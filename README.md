@@ -140,6 +140,20 @@ DiscordGoLiveBypass.exe -force -exe "C:\caminho\completo\Discord.exe"
 </details>
 
 <details>
+<summary><strong>Apareceu "a conexao foi bloqueada pela sua propria maquina"</strong></summary>
+<br>
+
+O Windows recusou a conexão antes de ela sair para a internet, com o código `WSAEACCES` (na mensagem original: *an attempt was made to access a socket in a way forbidden by its access permissions*). Não é a lista de proxies fora do ar nem sua internet: é algo instalado aí barrando este programa, quase sempre um antivírus com proteção de rede (Avast, AVG, ESET, Kaspersky, McAfee) ou uma regra de saída do Firewall do Windows. O executável não tem assinatura digital, e programa sem assinatura é o alvo preferido dessas proteções.
+
+O que tentar, nessa ordem:
+
+1. Abra seu antivírus, procure a lista de exceções e adicione o `DiscordGoLiveBypass.exe`.
+2. Se você usa VPN, feche-a e rode de novo: alguns clientes deixam um filtro de rede ativo mesmo desconectados.
+3. Se continuar, confira no Firewall do Windows (Segurança Avançada, Regras de Saída) se existe uma regra bloqueando o programa.
+4. Se preferir não mexer em exceção nenhuma, [compile do código-fonte](#compilar-do-código-fonte): o binário que sai do seu próprio `go build` costuma passar.
+</details>
+
+<details>
 <summary><strong>Apareceu "nenhuma proxy da lista passou nos testes"</strong></summary>
 <br>
 
@@ -174,20 +188,6 @@ O programa já evita essas pastas sozinho e usa a última versão que estiver co
 </details>
 
 <details>
-<summary><strong>Apareceu "a conexao foi bloqueada pela sua propria maquina"</strong></summary>
-<br>
-
-O Windows recusou a conexão antes de ela sair para a internet, com o código `WSAEACCES` (na mensagem original: *an attempt was made to access a socket in a way forbidden by its access permissions*). Não é a lista de proxies fora do ar nem sua internet: é algo instalado aí barrando este programa, quase sempre um antivírus com proteção de rede (Avast, AVG, ESET, Kaspersky, McAfee) ou uma regra de saída do Firewall do Windows. O executável não tem assinatura digital, e programa sem assinatura é o alvo preferido dessas proteções.
-
-O que tentar, nessa ordem:
-
-1. Abra seu antivírus, procure a lista de exceções e adicione o `DiscordGoLiveBypass.exe`.
-2. Se você usa VPN, feche-a e rode de novo: alguns clientes deixam um filtro de rede ativo mesmo desconectados.
-3. Se continuar, confira no Firewall do Windows (Segurança Avançada, Regras de Saída) se existe uma regra bloqueando o programa.
-4. Se preferir não mexer em exceção nenhuma, [compile do código-fonte](#compilar-do-código-fonte): o binário que sai do seu próprio `go build` costuma passar.
-</details>
-
-<details>
 <summary><strong>O Discord abre mas fica travado em "Connecting"</strong></summary>
 <br>
 
@@ -199,6 +199,15 @@ O servidor escolhido morreu entre o teste e a abertura, o que acontece com servi
 <br>
 
 Duas possibilidades. A primeira é você ter um plugin de bypass ativo no Vencord ou BetterDiscord: ele mexe na conexão depois que o Discord abre e desfaz o que este programa fez, então desative e tente de novo. A segunda é o servidor sorteado estar num país que também tem restrição, e aí vale recusar mais países com `-exclude BR,AR,CL`.
+</details>
+
+<details>
+<summary><strong>O Discord ficou lento, e mandar anexo demora</strong></summary>
+<br>
+
+Em parte é esperado: sua conexão passa a sair por um servidor público gratuito, que tem latência alta e banda de subida apertada. O programa escolhe o de menor resposta que encontra e avisa quando o melhor disponível ainda é ruim, mas ele não faz milagre com a lista do dia.
+
+O upload de anexo era um caso pior que o resto, e isso foi corrigido: ele sobe para um bucket do Google, que agora sai por fora do proxy como o resto da mídia. Se a lentidão geral incomodar, use um servidor melhor com `-proxy socks5://ip:porta` ou deixe um Tor local aberto, que o programa prefere sozinho.
 </details>
 
 ### Segurança e risco
@@ -251,7 +260,9 @@ Ele acha o `Discord.exe` da versão mais nova em `%LOCALAPPDATA%`, procura um se
 
 A validação de cada candidato vai até o fim: túnel SOCKS5, TLS e resposta `200` da API do Discord, e só então o país de saída, conferido em `ifconfig.co` por dentro do mesmo túnel. Servidor que apenas aceita a conexão passa em teste ingênuo e trava o app depois.
 
-Mídia pesada (`cdn.discordapp.com`, `*.discordapp.net`, `*.discord.media`) sai por fora do proxy de propósito: mandá-la por um servidor gratuito destruiria a qualidade da transmissão sem ganho nenhum, já que quem determina a região é a API.
+Entre os que passam, vence o de menor resposta, não o primeiro que respondeu. Achando um abaixo de 1200 ms o programa para ali mesmo; sem nenhum tão bom, ele testa a lista inteira e só então compara todos, porque parar cedo entregava um servidor de 2000 ms enquanto um de 300 ms esperava no lote seguinte. O guardado da última vez também perde a preferência quando está lento, mas continua de reserva caso a busca não ache nada melhor.
+
+Mídia pesada sai por fora do proxy de propósito: mandá-la por um servidor gratuito destruiria a qualidade da transmissão sem ganho nenhum, já que quem determina a região é a API. São `cdn.discordapp.com`, `*.discordapp.net` e `*.discord.media` no que você recebe, e `*.storage.googleapis.com` no que você envia, porque o anexo não sobe para o Discord: sobe para uma URL assinada que a API devolve, num bucket do Google. Isso entra por curinga e não por nome, já que o nome do bucket muda de versão.
 
 Que o mecanismo funciona dá para verificar: subindo o Discord com um servidor propositalmente morto, o carregamento inteiro morre junto, com `ERR_PROXY_CONNECTION_FAILED`, e o app não passa da tela inicial.
 
