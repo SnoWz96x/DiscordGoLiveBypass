@@ -31,6 +31,9 @@ const (
 	cacheMaxAge      = 24 * time.Hour
 	fastProbeTimeout = 2500 * time.Millisecond
 	torPortTimeout   = 400 * time.Millisecond
+
+	preferredLatency = 1200 * time.Millisecond
+	tolerableLatency = 2 * time.Second
 )
 
 // Bridge meek, Tor Browser, daemon e Brave, nessa ordem.
@@ -161,6 +164,19 @@ type choice struct {
 	country  string
 }
 
+// Da mais rápida para a mais lenta, sem repetir quem já gastou a consulta de país.
+func rankProbed(pool []probeResult, limit time.Duration, asked map[string]bool) []probeResult {
+	var usable []probeResult
+	for _, result := range pool {
+		if result.latency > limit || asked[result.endpoint.String()] {
+			continue
+		}
+		usable = append(usable, result)
+	}
+	sort.SliceStable(usable, func(i, j int) bool { return usable[i].latency < usable[j].latency })
+	return usable
+}
+
 func PickFreeProxy(excluded map[string]bool, deadline time.Time, ui *UI) (choice, error) {
 	ui.Busy("baixando a lista publica de proxies")
 	body, err := downloadText(freeProxyAPI)
@@ -183,9 +199,29 @@ func PickFreeProxy(excluded map[string]bool, deadline time.Time, ui *UI) (choice
 	var tested, alive int64
 	ui.Progress(0, len(candidates), "testando conexao com o Discord")
 
+	var pool []probeResult
+	asked := map[string]bool{}
+	expired := false
+
+	confirm := func(limit time.Duration) (choice, bool) {
+		for _, result := range rankProbed(pool, limit, asked) {
+			ui.Busy("conferindo o pais de saida de %s", result.endpoint)
+			country, err := Accepts(result.endpoint, excluded, probeTimeout)
+			asked[result.endpoint.String()] = true
+			if err != nil {
+				ui.Detail("%s recusada: %v", result.endpoint, err)
+				continue
+			}
+			ui.Ok("%s serve, %d ms, saida em %s", result.endpoint, result.latency.Milliseconds(), CountryLabel(country))
+			return choice{result.endpoint, result.latency, country}, true
+		}
+		return choice{}, false
+	}
+
 	for start := 0; start < len(candidates); start += parallelProbes {
 		if time.Now().After(deadline) {
-			return choice{}, errors.New("o prazo acabou antes de achar uma proxy valida")
+			expired = true
+			break
 		}
 
 		end := start + parallelProbes
@@ -211,31 +247,33 @@ func PickFreeProxy(excluded map[string]bool, deadline time.Time, ui *UI) (choice
 		}
 		wg.Wait()
 
-		var working []probeResult
+		found := 0
 		for _, result := range results {
 			if result != nil {
-				working = append(working, *result)
+				pool = append(pool, *result)
+				found++
 			}
 		}
-		sort.Slice(working, func(i, j int) bool { return working[i].latency < working[j].latency })
-
-		if len(working) == 0 {
+		if found == 0 {
 			ui.Detail("lote %d: nenhuma das %d respondeu", start/parallelProbes+1, len(batch))
 			continue
 		}
 
-		for _, result := range working {
-			ui.Busy("conferindo o pais de saida de %s", result.endpoint)
-			country, err := Accepts(result.endpoint, excluded, probeTimeout)
-			if err != nil {
-				ui.Detail("%s recusada: %v", result.endpoint, err)
-				continue
-			}
-			ui.Ok("%s serve, %d ms, saida em %s", result.endpoint, result.latency.Milliseconds(), CountryLabel(country))
-			return choice{result.endpoint, result.latency, country}, nil
+		if chosen, ok := confirm(preferredLatency); ok {
+			return chosen, nil
 		}
 	}
 
+	chosen, ok := confirm(probeTimeout)
+	switch {
+	case ok:
+		if chosen.latency > tolerableLatency {
+			ui.Warn("a melhor da lista respondeu em %d ms: da para usar, mas anexo e chamada vao sofrer", chosen.latency.Milliseconds())
+		}
+		return chosen, nil
+	case expired:
+		return choice{}, errors.New("o prazo acabou antes de achar uma proxy valida")
+	}
 	return choice{}, errors.New("nenhuma proxy da lista passou nos testes")
 }
 

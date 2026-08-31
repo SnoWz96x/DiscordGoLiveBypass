@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestParseExcluded(t *testing.T) {
 	got := ParseExcluded(" br , AR, x, 123, ")
@@ -51,5 +54,30 @@ func TestRankFreeProxies(t *testing.T) {
 func TestRankFreeProxiesBadJSON(t *testing.T) {
 	if _, err := rankFreeProxies("<html>nao sou json</html>", nil); err == nil {
 		t.Error("queria erro, veio lista")
+	}
+}
+
+func TestRankProbed(t *testing.T) {
+	pool := []probeResult{
+		{Endpoint{"socks5", "1.1.1.1", 1080}, 2000 * time.Millisecond},
+		{Endpoint{"socks5", "2.2.2.2", 1080}, 300 * time.Millisecond},
+		{Endpoint{"socks5", "3.3.3.3", 1080}, 900 * time.Millisecond},
+	}
+	asked := map[string]bool{"socks5://2.2.2.2:1080": true}
+
+	got := rankProbed(pool, preferredLatency, asked)
+	if len(got) != 1 || got[0].endpoint.Host != "3.3.3.3" {
+		t.Fatalf("sob o limite preferido = %v, queria so a de 900 ms", got)
+	}
+
+	got = rankProbed(pool, probeTimeout, asked)
+	want := []string{"3.3.3.3", "1.1.1.1"}
+	if len(got) != len(want) {
+		t.Fatalf("sem limite apertado sobraram %d, queria %v", len(got), want)
+	}
+	for i, result := range got {
+		if result.endpoint.Host != want[i] {
+			t.Errorf("posicao %d = %s, queria %s", i, result.endpoint.Host, want[i])
+		}
 	}
 }

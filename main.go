@@ -269,9 +269,14 @@ func resolveProxy(opts options, excluded map[string]bool, ui *UI) (choice, error
 		return choice{endpoint, latency, country}, nil
 	}
 
+	var slow *choice
 	if !opts.noCache {
 		if cached, ok := ReuseCachedProxy(excluded, ui); ok {
-			return cached, nil
+			if cached.latency <= tolerableLatency {
+				return cached, nil
+			}
+			ui.Warn("a proxy guardada respondeu em %d ms, lenta demais para anexo e chamada; vou procurar uma melhor", cached.latency.Milliseconds())
+			slow = &cached
 		}
 	}
 
@@ -282,5 +287,14 @@ func resolveProxy(opts options, excluded map[string]bool, ui *UI) (choice, error
 		}
 	}
 
-	return PickFreeProxy(excluded, deadline, ui)
+	chosen, err := PickFreeProxy(excluded, deadline, ui)
+	switch {
+	case err == nil && slow != nil && slow.latency <= chosen.latency:
+		ui.Detail("a guardada continua sendo a mais rapida, ficando com ela")
+		return *slow, nil
+	case err != nil && slow != nil:
+		ui.Warn("nao achei nada melhor que a guardada, ficando com ela mesmo lenta")
+		return *slow, nil
+	}
+	return chosen, err
 }
