@@ -12,7 +12,7 @@ import (
 
 // Mídia e anexo saem por fora: mandar isso por proxy público gratuito transforma qualquer
 // imagem em dez segundos de espera, e nada disso muda a região que o Discord enxerga.
-const defaultBypass = "cdn.discordapp.com;*.discordapp.net;*.discord.media;<local>"
+const defaultBypass = "cdn.discordapp.com;*.discordapp.net;*.discord.media;*.storage.googleapis.com;<local>"
 
 // Tempo que o processo precisa sobreviver para a abertura contar como bem-sucedida. Quem
 // morre por instalação quebrada morre bem antes disso.
