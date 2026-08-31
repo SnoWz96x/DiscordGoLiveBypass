@@ -24,6 +24,7 @@ type options struct {
 	channel  string
 	exePath  string
 	bypass   string
+	route    string
 	force    bool
 	noCache  bool
 	noTor    bool
@@ -42,6 +43,7 @@ func main() {
 	flag.StringVar(&opts.channel, "channel", "auto", "canal do Discord: auto, stable, ptb ou canary")
 	flag.StringVar(&opts.exePath, "exe", "", "caminho explicito do executavel, ignora a deteccao automatica")
 	flag.StringVar(&opts.bypass, "bypass", defaultBypass, "lista de dominios que saem por fora do proxy")
+	flag.StringVar(&opts.route, "route", string(RouteAll), "o que sai pelo proxy: all (o app todo), pac-all (idem, por PAC) ou pac-gateway (so o gateway)")
 	flag.BoolVar(&opts.force, "force", false, "encerra um Discord ja aberto antes de subir o novo")
 	flag.BoolVar(&opts.noCache, "no-cache", false, "ignora a proxy guardada da execucao anterior")
 	flag.BoolVar(&opts.noTor, "no-tor", false, "nao procura um cliente Tor local")
@@ -84,6 +86,11 @@ func run(opts options, ui *UI) error {
 	excluded := ParseExcluded(opts.exclude)
 	if len(excluded) == 0 {
 		return errors.New("a lista de paises recusados ficou vazia, informe algo como -exclude BR")
+	}
+
+	route, err := ParseRoute(opts.route)
+	if err != nil {
+		return err
 	}
 
 	steps := 3
@@ -142,6 +149,7 @@ func run(opts options, ui *UI) error {
 		{"saida", CountryLabel(chosen.country)},
 		{"servidor", chosen.endpoint.String()},
 		{"resposta", fmt.Sprintf("%d ms", chosen.latency.Milliseconds())},
+		{"rota", routeLabel(route)},
 	}
 
 	if opts.checkRun {
@@ -156,7 +164,14 @@ func run(opts options, ui *UI) error {
 		return err
 	}
 
-	args := append(ProxyArgs(chosen.endpoint, opts.bypass, opts.fallback), opts.extra...)
+	routeArgs, pacPath, err := RouteArgs(chosen.endpoint, route, opts.bypass, opts.fallback)
+	if err != nil {
+		return err
+	}
+	if pacPath != "" {
+		ui.Detail("regra de rota escrita em %s", pacPath)
+	}
+	args := append(routeArgs, opts.extra...)
 	ui.Busy("subindo o processo com as flags de proxy")
 	pid, err := Launch(binary, args)
 	if err != nil {
@@ -173,10 +188,22 @@ func run(opts options, ui *UI) error {
 	ui.Ok("%s aberto, pid %d", channel.Friendly, pid)
 	ui.Detail("%s", args[0])
 
-	ui.Summary("tudo pronto", append(summary,
-		[2]string{"discord", fmt.Sprintf("%s, pid %d", channel.Friendly, pid)},
-		[2]string{"sem proxy", opts.bypass}))
+	rows := append(summary, [2]string{"discord", fmt.Sprintf("%s, pid %d", channel.Friendly, pid)})
+	if route == RouteAll {
+		rows = append(rows, [2]string{"sem proxy", opts.bypass})
+	}
+	ui.Summary("tudo pronto", rows)
 	return nil
+}
+
+func routeLabel(mode RouteMode) string {
+	switch mode {
+	case RoutePacAll:
+		return "o app todo, por PAC (controle do experimento)"
+	case RoutePacGateway:
+		return "so o gateway, o resto direto (experimento)"
+	}
+	return "o app todo, menos a lista de midia"
 }
 
 func excludedLabel(excluded map[string]bool) string {
@@ -257,7 +284,7 @@ func resolveProxy(opts options, excluded map[string]bool, ui *UI) (choice, error
 		if err != nil {
 			// Quem escolheu um proxy quer aquele, então não caímos para a busca automática:
 			// ser mandado para um endereço desconhecido em silêncio é pior que o erro.
-			return choice{}, fmt.Errorf("seu proxy %s nao respondeu: %w", endpoint, err)
+			return choice{}, fmt.Errorf("seu proxy %s nao respondeu: %s", endpoint, DescribeNetwork(err))
 		}
 
 		country, err := Accepts(endpoint, excluded, probeTimeout)
