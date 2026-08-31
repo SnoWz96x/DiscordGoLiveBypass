@@ -1,0 +1,40 @@
+{
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "identity": {
+          "name": "DiscordGoLiveBypass",
+          "version": "0.0.0.0"
+        },
+        "description": "Abre o Discord por um proxy fora do Brasil",
+        "minimum-os": "win7",
+        "execution-level": "as invoker",
+        "ui-access": false,
+        "auto-elevate": false,
+        "dpi-awareness": "system",
+        "long-path-aware": true
+      }
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "0.0.0.0",
+          "product_version": "0.0.0.0"
+        },
+        "info": {
+          "0409": {
+            "ProductName": "DiscordGoLiveBypass",
+            "FileDescription": "Abre o Discord por um proxy fora do Brasil",
+            "CompanyName": "Thomas Solcia",
+            "LegalCopyright": "Licenca GPL-3.0, codigo em github.com/thomassolcia/DiscordGoLiveBypass",
+            "OriginalFilename": "DiscordGoLiveBypass.exe",
+            "InternalName": "DiscordGoLiveBypass",
+            "Comments": "Codigo aberto. Compilado pelo GitHub Actions, com log publico e soma SHA256 em cada release."
+          }
+        }
+      }
+    }
+  }
+}
