@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,7 +72,8 @@ func WritePac(script string) (string, error) {
 }
 
 func PacURL(path string) string {
-	return "file:///" + strings.TrimPrefix(strings.ReplaceAll(filepath.ToSlash(path), " ", "%20"), "/")
+	path = strings.ReplaceAll(filepath.ToSlash(path), "\\", "/")
+	return (&url.URL{Scheme: "file", Path: "/" + strings.TrimPrefix(path, "/")}).String()
 }
 
 func RouteArgs(e Endpoint, mode RouteMode, bypass string, fallbackDirect bool) ([]string, string, error) {

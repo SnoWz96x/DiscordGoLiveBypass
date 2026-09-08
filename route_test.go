@@ -47,3 +47,11 @@ func TestPacURL(t *testing.T) {
 		t.Errorf("PacURL = %q, queria %q", got, want)
 	}
 }
+
+func TestPacURLReservedCharacters(t *testing.T) {
+	got := PacURL(`C:\Users\a #b%\route.pac`)
+	want := "file:///C:/Users/a%20%23b%25/route.pac"
+	if got != want {
+		t.Fatalf("PacURL = %q, want %q", got, want)
+	}
+}
