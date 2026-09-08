@@ -52,6 +52,15 @@ func OpenTunnel(e Endpoint, host string, port int, timeout time.Duration) (net.C
 		conn.Close()
 		return nil, err
 	}
+	// HTTPS proxies require TLS to the proxy before the CONNECT request.
+	if e.Scheme == "https" {
+		secure := tls.Client(conn, &tls.Config{ServerName: e.Host, MinVersion: tls.VersionTLS12})
+		if err := secure.Handshake(); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("TLS com o proxy: %w", err)
+		}
+		conn = secure
+	}
 
 	if e.Scheme == "socks5" {
 		err = negotiateSOCKS5(conn, host, port)
